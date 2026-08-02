@@ -1,0 +1,27 @@
+# ArrayDeck — compatibility mode (direct Docker socket).
+# The socket grants the process broad host power even though ArrayDeck is
+# read-only by design; see docker-compose.hardened.yml for the socket-proxy
+# deployment.
+services:
+  arraydeck:
+    build:
+      context: ../..
+    image: arraydeck:local
+    container_name: arraydeck
+    ports:
+      - "8417:8417"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - arraydeck-data:/data
+      # On Unraid, mount the dockerMan templates read-only:
+      # - /boot/config/plugins/dockerMan/templates-user:/unraid/templates:ro
+    environment:
+      # Optional Unraid GraphQL API (read-only key; never sent to the browser):
+      # UNRAID_API_URL: "http://tower.local/graphql"
+      # UNRAID_API_KEY: "unraid_..."
+      RECONCILE_INTERVAL_SECONDS: "30"
+      LOG_LEVEL: "info"
+    restart: unless-stopped
+
+volumes:
+  arraydeck-data:

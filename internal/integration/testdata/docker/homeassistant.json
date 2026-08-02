@@ -1,0 +1,30 @@
+{
+  "Id": "ccc333ddd444eee555fff666aaa111bbb222ccc333ddd444eee555fff666aaa1",
+  "Name": "/homeassistant",
+  "Created": "2026-05-20T14:00:00.000000000Z",
+  "State": {
+    "Status": "running",
+    "StartedAt": "2026-07-30T08:02:00.000000000Z",
+    "Health": null
+  },
+  "Config": {
+    "Image": "ghcr.io/home-assistant/home-assistant:stable",
+    "Labels": {
+      "net.unraid.docker.managed": "dockerman"
+    },
+    "ExposedPorts": {
+      "8123/tcp": {}
+    }
+  },
+  "HostConfig": {
+    "NetworkMode": "host"
+  },
+  "NetworkSettings": {
+    "Ports": {},
+    "Networks": {
+      "host": {
+        "IPAddress": ""
+      }
+    }
+  }
+}

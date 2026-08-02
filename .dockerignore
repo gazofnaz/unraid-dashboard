@@ -1,0 +1,9 @@
+.git
+docs/
+deploy/
+web/node_modules
+web/dist
+internal/api/webdist
+data/
+*.md
+Makefile

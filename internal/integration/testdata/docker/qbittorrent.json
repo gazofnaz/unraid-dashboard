@@ -1,0 +1,53 @@
+{
+  "Id": "bbb222ccc333ddd444eee555fff666aaa111bbb222ccc333ddd444eee555fff6",
+  "Name": "/qbittorrent",
+  "Created": "2026-06-15T09:30:00.000000000Z",
+  "State": {
+    "Status": "running",
+    "StartedAt": "2026-07-30T08:01:00.000000000Z",
+    "Health": null
+  },
+  "Config": {
+    "Image": "ghcr.io/hotio/qbittorrent:release",
+    "Labels": {
+      "net.unraid.docker.managed": "dockerman",
+      "net.unraid.docker.webui": "http://[IP]:[PORT:8080]/",
+      "net.unraid.docker.icon": "https://raw.githubusercontent.com/example/icons/qbittorrent.png"
+    },
+    "ExposedPorts": {
+      "8080/tcp": {},
+      "6881/tcp": {},
+      "6881/udp": {}
+    }
+  },
+  "HostConfig": {
+    "NetworkMode": "bridge"
+  },
+  "NetworkSettings": {
+    "Ports": {
+      "8080/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "8080"
+        }
+      ],
+      "6881/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "6881"
+        }
+      ],
+      "6881/udp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "6881"
+        }
+      ]
+    },
+    "Networks": {
+      "bridge": {
+        "IPAddress": "172.17.0.14"
+      }
+    }
+  }
+}

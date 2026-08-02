@@ -1,0 +1,42 @@
+{
+  "Id": "eee555fff666aaa111bbb222ccc333ddd444eee555fff666aaa111bbb222ccc3",
+  "Name": "/whoami",
+  "Created": "2026-07-10T16:00:00.000000000Z",
+  "State": {
+    "Status": "running",
+    "StartedAt": "2026-07-30T08:04:00.000000000Z",
+    "Health": null
+  },
+  "Config": {
+    "Image": "containous/whoami:latest",
+    "Labels": {
+      "com.docker.compose.project": "edge",
+      "com.docker.compose.service": "whoami",
+      "traefik.enable": "true",
+      "traefik.http.routers.whoami.rule": "Host(`whoami.home.example`)",
+      "traefik.http.routers.whoami.entrypoints": "websecure",
+      "traefik.http.services.whoami.loadbalancer.server.port": "80"
+    },
+    "ExposedPorts": {
+      "80/tcp": {}
+    }
+  },
+  "HostConfig": {
+    "NetworkMode": "edge_default"
+  },
+  "NetworkSettings": {
+    "Ports": {
+      "80/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "8085"
+        }
+      ]
+    },
+    "Networks": {
+      "edge_default": {
+        "IPAddress": "172.19.0.3"
+      }
+    }
+  }
+}

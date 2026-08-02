@@ -1,0 +1,49 @@
+# ArrayDeck — hardened mode. A filtered socket proxy owns the Docker socket;
+# ArrayDeck only reaches the read-only endpoints it needs and runs unprivileged
+# on an internal network.
+services:
+  docker-proxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:0.3
+    container_name: arraydeck-docker-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: "1"   # list/inspect
+      EVENTS: "1"
+      INFO: "0"
+      IMAGES: "0"
+      NETWORKS: "1"
+      VERSION: "1"
+      POST: "0"         # every write method disabled
+    networks:
+      - arraydeck-internal
+    restart: unless-stopped
+
+  arraydeck:
+    build:
+      context: ../..
+    image: arraydeck:local
+    container_name: arraydeck
+    user: "99:100" # Unraid's nobody:users; adjust for your host
+    depends_on:
+      - docker-proxy
+    ports:
+      - "8417:8417"
+    volumes:
+      - arraydeck-data:/data
+      # - /boot/config/plugins/dockerMan/templates-user:/unraid/templates:ro
+    environment:
+      DOCKER_HOST: "tcp://docker-proxy:2375"
+      # UNRAID_API_URL: "http://tower.local/graphql"
+      # UNRAID_API_KEY: "unraid_..."
+    networks:
+      - arraydeck-internal
+      - default
+    restart: unless-stopped
+
+networks:
+  arraydeck-internal:
+    internal: true
+
+volumes:
+  arraydeck-data:

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Home Assistant</Name>
+  <Repository>ghcr.io/home-assistant/home-assistant</Repository>
+  <Network>host</Network>
+  <WebUI>http://[IP]:[PORT:8123]</WebUI>
+  <Icon>https://raw.githubusercontent.com/example/icons/home-assistant.png</Icon>
+  <Category>HomeAutomation:</Category>
+  <Project>https://www.home-assistant.io/</Project>
+  <Overview>Open source home automation that puts local control first.</Overview>
+</Container>

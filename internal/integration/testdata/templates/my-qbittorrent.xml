@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>qbittorrent</Name>
+  <Repository>ghcr.io/hotio/qbittorrent</Repository>
+  <Registry>https://ghcr.io/hotio/qbittorrent</Registry>
+  <Network>bridge</Network>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/example/icons/qbittorrent.png</Icon>
+  <Category>Downloaders:Other</Category>
+  <Project>https://www.qbittorrent.org/</Project>
+  <Overview>qBittorrent is a cross-platform BitTorrent client.</Overview>
+</Container>

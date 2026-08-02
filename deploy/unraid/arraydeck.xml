@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>ArrayDeck</Name>
+  <Repository>ghcr.io/gazofnaz/arraydeck:latest</Repository>
+  <Registry>https://ghcr.io/gazofnaz/arraydeck</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/gazofnaz/unraid-dashboard/issues</Support>
+  <Project>https://github.com/gazofnaz/unraid-dashboard</Project>
+  <Overview>
+    ArrayDeck lists every Docker container on your Unraid server and derives the
+    best available front-end URL automatically from Docker labels, dockerMan
+    templates, reverse-proxy labels and safe HTTP probes. No per-application
+    setup: containers are discovered, links are resolved, groups are inferred,
+    and every decision has an inspectable trace. Read-only by design.
+  </Overview>
+  <Category>Tools:Utilities Tools:System</Category>
+  <WebUI>http://[IP]:[PORT:8417]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/gazofnaz/unraid-dashboard/master/docs/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8417" Default="8417" Mode="tcp" Description="ArrayDeck web interface port." Type="Port" Display="always" Required="true" Mask="false">8417</Config>
+  <Config Name="Docker socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Read-only Docker socket for container list/inspect/events. For hardened deployments remove this and set DOCKER_HOST to a socket proxy instead." Type="Path" Display="always" Required="true" Mask="false">/var/run/docker.sock</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/arraydeck" Mode="rw" Description="SQLite database with settings, overrides, icon cache and discovery decisions." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/arraydeck</Config>
+  <Config Name="dockerMan templates" Target="/unraid/templates" Default="/boot/config/plugins/dockerMan/templates-user" Mode="ro" Description="Unraid user templates, parsed read-only for WebUI patterns, icons and categories. The flash device is never written." Type="Path" Display="always" Required="false" Mask="false">/boot/config/plugins/dockerMan/templates-user</Config>
+  <Config Name="Unraid API URL" Target="UNRAID_API_URL" Default="" Description="Optional: the Unraid GraphQL endpoint, e.g. http://tower.local/graphql. Enables hostname/LAN detection and server info." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Unraid API key" Target="UNRAID_API_KEY" Default="" Description="Optional: a READ-ONLY Unraid API key. Never exposed to the browser." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Reconcile interval (seconds)" Target="RECONCILE_INTERVAL_SECONDS" Default="30" Description="Full re-discovery interval; Docker events update the UI within ~2 seconds regardless." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="info" Description="debug, info, warn or error (JSON logs)." Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+</Container>
