@@ -1,7 +1,7 @@
 // Package unraid is an optional adapter for the Unraid GraphQL API. It uses a
-// read-only API key, discovers capabilities through schema introspection
-// instead of assuming a fixed Unraid version, and degrades gracefully when
-// unavailable. The key is never sent to the browser.
+// read-only API key and prefers schema introspection over assuming a fixed
+// Unraid version, falling back to attempting the queries directly on the
+// builds that refuse it. The key is never sent to the browser.
 package unraid
 
 import (
@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,10 +26,12 @@ type Adapter struct {
 	apiKey   string
 	http     *http.Client
 
-	mu       sync.Mutex
-	fields   map[string]bool // root query fields discovered by introspection
-	lastErr  error
-	identity Identity
+	mu           sync.Mutex
+	fields       map[string]bool // root query fields discovered by introspection
+	introspected bool            // false when the schema is unknown, not when it is empty
+	contacted    bool            // set after the first Refresh, successful or not
+	lastErr      error
+	identity     Identity
 }
 
 // Identity is the server metadata the adapter can discover.
@@ -96,7 +99,7 @@ func (a *Adapter) query(ctx context.Context, q string) (json.RawMessage, error) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unraid api: %s", resp.Status)
+		return nil, fmt.Errorf("unraid api: %s%s", resp.Status, describeBody(resp.Body))
 	}
 	var out gqlResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -114,11 +117,17 @@ func (a *Adapter) Refresh(ctx context.Context) {
 	if a == nil {
 		return
 	}
-	err := a.introspect(ctx)
-	if err == nil {
-		err = a.fetchIdentity(ctx)
+	// Introspection is a bonus, not a gate. Apollo disables it by default in
+	// production builds and still answers ordinary queries, so a refusal here
+	// means the capability map is unknown -- not that the server is unusable.
+	if err := a.introspect(ctx); err != nil {
+		a.mu.Lock()
+		a.fields, a.introspected = nil, false
+		a.mu.Unlock()
 	}
+	err := a.fetchIdentity(ctx)
 	a.mu.Lock()
+	a.contacted = true
 	a.lastErr = err
 	a.mu.Unlock()
 }
@@ -145,25 +154,37 @@ func (a *Adapter) introspect(ctx context.Context) error {
 		fields[f.Name] = true
 	}
 	a.mu.Lock()
-	a.fields = fields
+	a.fields, a.introspected = fields, true
 	a.mu.Unlock()
 	return nil
 }
 
+// hasField reports whether a root query field is worth attempting. With the
+// schema unknown every field is, and a server that refuses introspection still
+// answers the ones it implements.
 func (a *Adapter) hasField(name string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if !a.introspected {
+		return true
+	}
 	return a.fields[name]
 }
 
-// fetchIdentity reads hostname, version, uptime and network addresses using
-// only fields the schema advertises. Every part is optional.
+// fetchIdentity reads hostname, version, uptime and network addresses. It
+// skips fields introspection ruled out, and attempts all of them when the
+// schema is unknown. Every part is optional; only a total failure is an error.
 func (a *Adapter) fetchIdentity(ctx context.Context) error {
 	ident := Identity{Interfaces: map[string][]string{}}
+	var attempted int
+	var firstErr error
 
 	if a.hasField("info") {
+		attempted++
 		raw, err := a.query(ctx, `{ info { os { hostname uptime } versions { unraid } } }`)
-		if err == nil {
+		if err != nil {
+			firstErr = err
+		} else {
 			var doc struct {
 				Info struct {
 					OS struct {
@@ -186,8 +207,13 @@ func (a *Adapter) fetchIdentity(ctx context.Context) error {
 	}
 
 	if a.hasField("network") {
+		attempted++
 		raw, err := a.query(ctx, `{ network { iface { ifaceName ipv4 ip } } }`)
-		if err == nil && raw != nil {
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+		} else if raw != nil {
 			parseInterfaces(raw, &ident)
 		}
 	}
@@ -195,6 +221,12 @@ func (a *Adapter) fetchIdentity(ctx context.Context) error {
 	a.mu.Lock()
 	a.identity = ident
 	a.mu.Unlock()
+
+	// Only a total washout counts as an outage: one field missing still leaves
+	// the rest of the identity usable, and the dashboard runs on Docker alone.
+	if attempted > 0 && ident.Hostname == "" && len(ident.LANAddresses) == 0 {
+		return firstErr
+	}
 	return nil
 }
 
@@ -256,13 +288,40 @@ func (a *Adapter) Status() model.SourceStatus {
 		st.Error = redact(a.lastErr.Error(), a.apiKey)
 		return st
 	}
-	if a.fields == nil {
+	if !a.contacted {
 		st.Detail = "not contacted yet"
 		return st
 	}
 	st.Available = true
-	st.Detail = fmt.Sprintf("connected, %d query capabilities", len(a.fields))
+	if a.introspected {
+		st.Detail = fmt.Sprintf("connected, %d query capabilities", len(a.fields))
+	} else {
+		st.Detail = "connected, introspection disabled"
+	}
 	return st
+}
+
+// describeBody extracts the reason from a non-200 response. GraphQL servers
+// explain themselves in the body, and without it an introspection-disabled 400
+// is indistinguishable from a rejected key.
+func describeBody(r io.Reader) string {
+	raw, err := io.ReadAll(io.LimitReader(r, 4096))
+	if err != nil || len(raw) == 0 {
+		return ""
+	}
+	var out gqlResponse
+	if json.Unmarshal(raw, &out) == nil && len(out.Errors) > 0 {
+		return ": " + out.Errors[0].Message
+	}
+	return ": " + truncate(strings.TrimSpace(string(raw)), 200)
+}
+
+func truncate(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "..."
 }
 
 func contains(list []string, v string) bool {
