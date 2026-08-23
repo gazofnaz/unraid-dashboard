@@ -132,6 +132,30 @@ func (s *Store) SaveSettings(settings model.Settings) error {
 		ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`, settings)
 }
 
+// Linkstack loads the launcher configuration. A fresh database, or one whose
+// stored value no longer parses, returns the default launcher.
+func (s *Store) Linkstack() (model.Linkstack, error) {
+	stack := model.DefaultLinkstack()
+	var raw string
+	err := s.db.QueryRow(`SELECT value_json FROM settings WHERE key = 'linkstack'`).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return stack, nil
+	}
+	if err != nil {
+		return stack, err
+	}
+	if err := json.Unmarshal([]byte(raw), &stack); err != nil {
+		return model.DefaultLinkstack(), nil
+	}
+	return stack.Normalize(), nil
+}
+
+// SaveLinkstack persists the launcher configuration.
+func (s *Store) SaveLinkstack(l model.Linkstack) error {
+	return s.upsertJSON(`INSERT INTO settings (key, value_json, updated_at) VALUES ('linkstack', ?, ?)
+		ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`, l)
+}
+
 // Overrides returns all container overrides keyed by container key.
 func (s *Store) Overrides() (map[string]model.Override, error) {
 	rows, err := s.db.Query(`SELECT container_key, value_json FROM container_overrides`)

@@ -36,6 +36,8 @@ func New(a *app.App, log *slog.Logger) *Server {
 	s.mux.HandleFunc("DELETE /api/v1/containers/{id}/override", s.handleClearOverride)
 	s.mux.HandleFunc("GET /api/v1/settings", s.handleGetSettings)
 	s.mux.HandleFunc("PUT /api/v1/settings", s.handlePutSettings)
+	s.mux.HandleFunc("GET /api/v1/linkstack", s.handleGetLinkstack)
+	s.mux.HandleFunc("PUT /api/v1/linkstack", s.handlePutLinkstack)
 	s.mux.HandleFunc("POST /api/v1/discovery/reconcile", s.handleReconcile)
 	s.mux.HandleFunc("GET /api/v1/events", s.handleEvents)
 	s.mux.HandleFunc("GET /api/v1/icons/{key}", s.handleIcon)
@@ -124,6 +126,23 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.app.Settings())
+}
+
+func (s *Server) handleGetLinkstack(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.app.Linkstack())
+}
+
+func (s *Server) handlePutLinkstack(w http.ResponseWriter, r *http.Request) {
+	var stack model.Linkstack
+	if err := decodeJSON(r, &stack); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.app.SaveLinkstack(stack); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, s.app.Linkstack())
 }
 
 func (s *Server) handleReconcile(w http.ResponseWriter, _ *http.Request) {

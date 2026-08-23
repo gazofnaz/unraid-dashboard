@@ -165,6 +165,20 @@ export interface Settings {
   theme: string;
 }
 
+/** Address form a launcher link renders with. "" on an entry inherits the page. */
+export type LinkstackAddress = "hostname" | "lan-ip";
+
+export interface LinkstackEntry {
+  containerKey: string;
+  address?: LinkstackAddress;
+  hidden?: boolean;
+}
+
+export interface Linkstack {
+  address: LinkstackAddress;
+  entries: LinkstackEntry[];
+}
+
 export interface StatusPayload {
   version: string;
   sources: SourceStatus[];
@@ -172,6 +186,7 @@ export interface StatusPayload {
   server: ServerInfo;
   stats: Stats;
   settings: Settings;
+  linkstack: Linkstack;
 }
 
 export interface Patch {
@@ -236,6 +251,12 @@ export const api = {
     request<Settings>("/api/v1/settings", {
       method: "PUT",
       body: JSON.stringify(s),
+    }),
+  linkstack: () => request<Linkstack>("/api/v1/linkstack"),
+  saveLinkstack: (l: Linkstack) =>
+    request<Linkstack>("/api/v1/linkstack", {
+      method: "PUT",
+      body: JSON.stringify(l),
     }),
   reconcile: () =>
     request("/api/v1/discovery/reconcile", { method: "POST" }),

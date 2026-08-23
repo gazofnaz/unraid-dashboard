@@ -20,6 +20,9 @@ of truth.
   you override or dismiss without losing the discovered record.
 - **All containers stay visible.** Databases and workers show
   “No web interface detected” instead of disappearing.
+- **A launcher when you want one.** The Links page is a clean linkstack —
+  icon and name only — in an order you set, with domain or IP chosen per page
+  or per link. It is stored server-side, so every browser and phone agrees.
 - **Read-only by design.** No start/stop/restart, no Docker API passthrough.
 
 The full product and technical design lives in [`docs/`](docs/README.md).
@@ -94,6 +97,10 @@ applicable link instantly, with no rediscovery.
 - **LAN IP** — the selected private IPv4 address.
 - **Smart** — preserves explicit reverse-proxy hostnames, otherwise prefers the
   hostname. Containers with their own LAN address (macvlan/ipvlan) always use it.
+
+The Links page keeps its own domain/IP choice (saved for every browser, with a
+per-link override) so a curated launcher is not disturbed by the local toolbar
+mode used on the Applications page.
 
 ## Security model
 

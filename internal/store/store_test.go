@@ -32,6 +32,18 @@ func TestPersistenceSurvivesReopen(t *testing.T) {
 		t.Fatalf("save decision: %v", err)
 	}
 
+	stack := model.Linkstack{
+		Address: model.LinkModeLANIP,
+		Entries: []model.LinkstackEntry{
+			{ContainerKey: "sonarr"},
+			{ContainerKey: "qbittorrent", Address: model.LinkModeHostname},
+			{ContainerKey: "plex", Hidden: true},
+		},
+	}
+	if err := s.SaveLinkstack(stack); err != nil {
+		t.Fatalf("save linkstack: %v", err)
+	}
+
 	if err := s.IconPut("icon1", "image/png", []byte{1, 2, 3}, ""); err != nil {
 		t.Fatalf("icon put: %v", err)
 	}
@@ -71,6 +83,33 @@ func TestPersistenceSurvivesReopen(t *testing.T) {
 
 	if mime, body, ok := s2.IconGet("icon1"); !ok || mime != "image/png" || len(body) != 3 {
 		t.Errorf("icon cache lost: %s %v %v", mime, body, ok)
+	}
+
+	// The launcher order is a curated arrangement: order, per-link address and
+	// visibility all have to come back exactly as saved.
+	gotStack, err := s2.Linkstack()
+	if err != nil {
+		t.Fatalf("linkstack after reopen: %v", err)
+	}
+	if gotStack.Address != model.LinkModeLANIP || len(gotStack.Entries) != 3 {
+		t.Fatalf("linkstack lost: %+v", gotStack)
+	}
+	if gotStack.Entries[0].ContainerKey != "sonarr" ||
+		gotStack.Entries[1].ContainerKey != "qbittorrent" ||
+		gotStack.Entries[2].ContainerKey != "plex" {
+		t.Errorf("launcher order lost: %+v", gotStack.Entries)
+	}
+	if gotStack.Entries[1].Address != model.LinkModeHostname {
+		t.Errorf("per-link address lost: %+v", gotStack.Entries[1])
+	}
+	if !gotStack.Entries[2].Hidden {
+		t.Errorf("hidden link lost: %+v", gotStack.Entries[2])
+	}
+
+	// Global settings and the launcher share the settings table; neither may
+	// clobber the other.
+	if again, found, _ := s2.Settings(); !found || again.ServerHostname != "tower.lan" {
+		t.Errorf("settings clobbered by the launcher: %+v", again)
 	}
 
 	// Deleting an override works and persists.

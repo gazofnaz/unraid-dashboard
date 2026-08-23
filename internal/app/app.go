@@ -77,6 +77,7 @@ type StatusPayload struct {
 	Server    model.ServerInfo     `json:"server"`
 	Stats     Stats                `json:"stats"`
 	Settings  model.Settings       `json:"settings"`
+	Linkstack model.Linkstack      `json:"linkstack"`
 }
 
 // Patch is the SSE "patch" event: compact diffs, not full snapshots.
@@ -103,6 +104,7 @@ type App struct {
 	decisions    map[string]model.Decision
 	overrides    map[string]model.Override
 	settings     model.Settings
+	linkstack    model.Linkstack
 	dockerStatus model.SourceStatus
 	identity     model.HostIdentity
 	server       model.ServerInfo
@@ -132,6 +134,10 @@ func New(cfg config.Config, log *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	linkstack, err := st.Linkstack()
+	if err != nil {
+		return nil, err
+	}
 
 	a := &App{
 		cfg:       cfg,
@@ -145,6 +151,7 @@ func New(cfg config.Config, log *slog.Logger) (*App, error) {
 		decisions: decisions,
 		overrides: overrides,
 		settings:  settings,
+		linkstack: linkstack,
 		iconURLs:  map[string]string{},
 		kick:      make(chan []string, 16),
 	}
@@ -675,12 +682,13 @@ func (a *App) Status() StatusPayload {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return StatusPayload{
-		Version:  a.cfg.Version,
-		Sources:  []model.SourceStatus{a.dockerStatus, a.unraid.Status(), a.tmpl.Status()},
-		Identity: a.identity,
-		Server:   a.server,
-		Stats:    a.stats,
-		Settings: a.settings,
+		Version:   a.cfg.Version,
+		Sources:   []model.SourceStatus{a.dockerStatus, a.unraid.Status(), a.tmpl.Status()},
+		Identity:  a.identity,
+		Server:    a.server,
+		Stats:     a.stats,
+		Settings:  a.settings,
+		Linkstack: a.linkstack,
 	}
 }
 
@@ -789,6 +797,28 @@ func (a *App) SaveSettings(s model.Settings) error {
 	a.settings = s
 	a.mu.Unlock()
 	a.requestReconcile(nil)
+	return nil
+}
+
+// Linkstack returns the curated launcher configuration.
+func (a *App) Linkstack() model.Linkstack {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.linkstack
+}
+
+// SaveLinkstack persists the launcher configuration and publishes it to every
+// connected browser. No rediscovery is needed: ordering and address form are
+// presentation over endpoints that are already resolved.
+func (a *App) SaveLinkstack(l model.Linkstack) error {
+	l = l.Normalize()
+	if err := a.store.SaveLinkstack(l); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.linkstack = l
+	a.mu.Unlock()
+	a.publishStatus()
 	return nil
 }
 

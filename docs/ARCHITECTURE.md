@@ -99,6 +99,12 @@ icon_cache(cache_key TEXT PRIMARY KEY, mime TEXT, body BLOB, etag TEXT, updated_
 discovery_runs(id INTEGER PRIMARY KEY, started_at INTEGER, finished_at INTEGER, stats_json TEXT)
 ```
 
+The launcher (Links page) is a `settings` row under the key `linkstack`: an
+ordered list of container keys with the address form each link renders with and
+whether it is hidden. It is presentation over endpoints discovery has already
+resolved, so saving it never triggers rediscovery, and it rides the SSE `status`
+payload so every open browser reorders live.
+
 Avoid mirroring the entire Docker inventory into relational tables unless history becomes a product feature.
 
 ## 3. API shape
@@ -114,6 +120,8 @@ POST /api/v1/containers/{id}/override
 DELETE /api/v1/containers/{id}/override
 GET  /api/v1/settings
 PUT  /api/v1/settings
+GET  /api/v1/linkstack
+PUT  /api/v1/linkstack
 POST /api/v1/discovery/reconcile
 GET  /api/v1/events                 # SSE
 GET  /api/v1/icons/{cacheKey}

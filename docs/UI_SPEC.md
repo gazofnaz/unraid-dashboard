@@ -32,6 +32,19 @@ Danger           #F37F86
 
 Default landing page. Grouped, link-focused view of every container.
 
+### Links
+
+A linkstack: every container that resolved to a URL as one ordered column of
+icon-and-name rows, and nothing else. The order is explicit and user-owned;
+newly deployed applications append to the end rather than waiting to be added.
+An edit mode exposes reordering (drag handle, arrows), a page-wide domain/IP
+choice with a per-link override, and a hide toggle. The arrangement is stored
+server-side, so it is the same on every browser and phone.
+
+Links pinned by a reverse-proxy label or their own container LAN address ignore
+the domain/IP choice; the edit row says so rather than offering a control that
+would do nothing.
+
 ### Containers
 
 Denser inventory table with image, state, health, ports, network and endpoint confidence.

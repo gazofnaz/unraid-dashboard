@@ -3,6 +3,7 @@ import { useAppState } from "./store";
 
 const workspace = [
   { to: "/", label: "Applications", end: true },
+  { to: "/links", label: "Links" },
   { to: "/containers", label: "Containers" },
   { to: "/system", label: "System" },
 ];
@@ -63,6 +64,7 @@ export default function Shell() {
       <nav className="bottom-nav" aria-label="Primary">
         {[
           { to: "/", label: "Apps", end: true },
+          { to: "/links", label: "Links" },
           { to: "/containers", label: "Containers" },
           { to: "/system", label: "System" },
           { to: "/settings", label: "Settings" },

@@ -12,9 +12,12 @@ import {
   api,
   subscribe,
   type ContainerView,
+  type Linkstack,
   type LinkMode,
   type StatusPayload,
 } from "./api";
+
+const EMPTY_LINKSTACK: Linkstack = { address: "hostname", entries: [] };
 
 interface AppState {
   containers: ContainerView[];
@@ -24,6 +27,8 @@ interface AppState {
   connected: boolean;
   linkMode: LinkMode;
   setLinkMode: (m: LinkMode) => void;
+  linkstack: Linkstack;
+  saveLinkstack: (l: Linkstack) => Promise<void>;
   refresh: () => Promise<void>;
   reload: () => Promise<void>;
 }
@@ -76,6 +81,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await api.reconcile();
   }, []);
 
+  // The server echoes the normalized launcher back; adopt that rather than the
+  // draft so a rejected duplicate or unknown address form never lingers.
+  const saveLinkstack = useCallback(async (l: Linkstack) => {
+    const saved = await api.saveLinkstack(l);
+    setStatus((prev) => (prev ? { ...prev, linkstack: saved } : prev));
+  }, []);
+
   useEffect(() => {
     void reload();
     const close = subscribe({
@@ -112,10 +124,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       connected,
       linkMode,
       setLinkMode,
+      linkstack: status?.linkstack ?? EMPTY_LINKSTACK,
+      saveLinkstack,
       refresh,
       reload,
     }),
-    [containers, status, loading, error, connected, linkMode, setLinkMode, refresh, reload],
+    [
+      containers,
+      status,
+      loading,
+      error,
+      connected,
+      linkMode,
+      setLinkMode,
+      saveLinkstack,
+      refresh,
+      reload,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

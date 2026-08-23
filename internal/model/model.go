@@ -223,3 +223,68 @@ type ServerInfo struct {
 	UnraidVersion string `json:"unraidVersion,omitempty"`
 	UptimeSeconds int64  `json:"uptimeSeconds,omitempty"`
 }
+
+// LinkstackEntry is one row of the launcher page. It is keyed by container
+// key rather than ID so a curated order survives container recreation.
+type LinkstackEntry struct {
+	ContainerKey string `json:"containerKey"`
+	// Address overrides the page-wide address form for this link only.
+	// Empty inherits Linkstack.Address.
+	Address string `json:"address,omitempty"`
+	Hidden  bool   `json:"hidden,omitempty"`
+}
+
+// Linkstack is the curated launcher: an explicit order over the containers
+// that resolved to a URL, plus the address form their links use. Containers
+// absent from Entries are appended alphabetically, so newly deployed
+// applications appear on the page without being added by hand.
+type Linkstack struct {
+	Address string           `json:"address"` // hostname | lan-ip
+	Entries []LinkstackEntry `json:"entries"`
+}
+
+// DefaultLinkstack returns the launcher for a fresh install: nothing curated
+// yet, links addressed by hostname.
+func DefaultLinkstack() Linkstack {
+	return Linkstack{Address: LinkModeHostname, Entries: []LinkstackEntry{}}
+}
+
+// Normalize drops blank and duplicate keys and replaces unknown address forms
+// with the inherited default, so a malformed request cannot corrupt the page.
+func (l Linkstack) Normalize() Linkstack {
+	out := Linkstack{Address: l.Address, Entries: make([]LinkstackEntry, 0, len(l.Entries))}
+	if !isLinkstackAddress(out.Address) {
+		out.Address = LinkModeHostname
+	}
+	seen := make(map[string]bool, len(l.Entries))
+	for _, e := range l.Entries {
+		key := ContainerKey(e.ContainerKey)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		if !isLinkstackAddress(e.Address) {
+			e.Address = ""
+		}
+		e.ContainerKey = key
+		out.Entries = append(out.Entries, e)
+	}
+	return out
+}
+
+// AddressFor returns the address form one container's link should render with.
+func (l Linkstack) AddressFor(containerKey string) string {
+	for _, e := range l.Entries {
+		if e.ContainerKey == containerKey && e.Address != "" {
+			return e.Address
+		}
+	}
+	if isLinkstackAddress(l.Address) {
+		return l.Address
+	}
+	return LinkModeHostname
+}
+
+func isLinkstackAddress(s string) bool {
+	return s == LinkModeHostname || s == LinkModeLANIP
+}

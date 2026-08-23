@@ -5,6 +5,7 @@ import Applications from "./pages/Applications";
 import Containers from "./pages/Containers";
 import DiscoveryRules from "./pages/DiscoveryRules";
 import Inspector from "./pages/Inspector";
+import Linkstack from "./pages/Linkstack";
 import Settings from "./pages/Settings";
 import System from "./pages/System";
 
@@ -15,6 +16,7 @@ export default function App() {
         <Routes>
           <Route element={<Shell />}>
             <Route index element={<Applications />} />
+            <Route path="links" element={<Linkstack />} />
             <Route path="containers" element={<Containers />} />
             <Route path="containers/:id/discovery" element={<Inspector />} />
             <Route path="system" element={<System />} />
