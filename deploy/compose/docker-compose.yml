@@ -8,7 +8,7 @@ services:
     image: ghcr.io/gazofnaz/arraydeck:latest
     container_name: arraydeck
     ports:
-      - "8417:8417"
+      - "31:8417"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - arraydeck-data:/data
@@ -20,6 +20,14 @@ services:
       # UNRAID_API_KEY: "unraid_..."
       RECONCILE_INTERVAL_SECONDS: "30"
       LOG_LEVEL: "info"
+    labels:
+      # Unraid's dockerMan reads these off the running container, so the Docker
+      # tab shows a WebUI link and icon with no template to fill in by hand.
+      # [PORT:8417] is the *container* port: Unraid substitutes whichever host
+      # port it is published on, so re-mapping above needs no change here.
+      net.unraid.docker.managed: composeman
+      net.unraid.docker.webui: "http://[IP]:[PORT:8417]/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/gazofnaz/unraid-dashboard/master/docs/icon.png"
     restart: unless-stopped
 
 volumes:

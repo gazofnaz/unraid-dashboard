@@ -15,6 +15,10 @@ services:
       NETWORKS: "1"
       VERSION: "1"
       POST: "0"         # every write method disabled
+    labels:
+      # Claim it so Unraid's Docker tab stops offering to build a template.
+      # No webui label: the proxy has no front end, only ArrayDeck talks to it.
+      net.unraid.docker.managed: composeman
     networks:
       - arraydeck-internal
     restart: unless-stopped
@@ -27,7 +31,7 @@ services:
     depends_on:
       - docker-proxy
     ports:
-      - "8417:8417"
+      - "31:8417"
     volumes:
       - arraydeck-data:/data
       # - /boot/config/plugins/dockerMan/templates-user:/unraid/templates:ro
@@ -35,6 +39,14 @@ services:
       DOCKER_HOST: "tcp://docker-proxy:2375"
       # UNRAID_API_URL: "http://tower.local/graphql"
       # UNRAID_API_KEY: "unraid_..."
+    labels:
+      # Unraid's dockerMan reads these off the running container, so the Docker
+      # tab shows a WebUI link and icon with no template to fill in by hand.
+      # [PORT:8417] is the *container* port: Unraid substitutes whichever host
+      # port it is published on, so re-mapping above needs no change here.
+      net.unraid.docker.managed: composeman
+      net.unraid.docker.webui: "http://[IP]:[PORT:8417]/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/gazofnaz/unraid-dashboard/master/docs/icon.png"
     networks:
       - arraydeck-internal
       - default
