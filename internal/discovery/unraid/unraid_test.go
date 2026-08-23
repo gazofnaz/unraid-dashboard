@@ -136,6 +136,84 @@ func TestIntrospectionGatesUnknownFields(t *testing.T) {
 	}
 }
 
+// Unraid builds disagree on where the version lives. An unimplemented field
+// must not take down the hostname, which is what link resolution runs on.
+func TestUnsupportedFieldDoesNotSinkTheRest(t *testing.T) {
+	var versionAsks int
+	srv := fakeServer(t, func(q string) (int, string) {
+		switch {
+		case strings.Contains(q, "__schema"):
+			return http.StatusBadRequest, introspectionDisabled
+		case strings.Contains(q, "versions"):
+			versionAsks++
+			return http.StatusBadRequest, `{"errors":[{"message":"Cannot query field \"unraid\" on type \"InfoVersions\"."}]}`
+		case strings.Contains(q, "info"):
+			return http.StatusOK, `{"data":{"info":{"os":{"hostname":"Tower"}}}}`
+		case strings.Contains(q, "network"):
+			return http.StatusOK, `{"data":{"network":{"iface":[{"ifaceName":"br0","ipv4":"192.168.1.10/24"}]}}}`
+		}
+		return http.StatusOK, `{"data":{}}`
+	})
+	defer srv.Close()
+
+	a := New(srv.URL, "")
+	a.Refresh(context.Background())
+
+	if st := a.Status(); !st.Available {
+		t.Fatalf("one unsupported field sank the source: %+v", st)
+	}
+	id := a.Identity()
+	if id.Hostname != "Tower" {
+		t.Errorf("hostname = %q, want Tower", id.Hostname)
+	}
+	if len(id.LANAddresses) != 1 {
+		t.Errorf("LAN addresses = %v", id.LANAddresses)
+	}
+	if id.UnraidVersion != "" {
+		t.Errorf("version = %q, want empty", id.UnraidVersion)
+	}
+
+	// A rejected probe is a fact about the schema, not a transient failure:
+	// reconciling again must not ask for it a second time.
+	a.Refresh(context.Background())
+	if versionAsks != 1 {
+		t.Errorf("asked for the unsupported field %d times, want 1", versionAsks)
+	}
+	if id := a.Identity(); id.Hostname != "Tower" {
+		t.Errorf("hostname lost on the second refresh: %q", id.Hostname)
+	}
+}
+
+// A transient failure is not a schema fact and must be retried.
+func TestTransientFailureIsRetried(t *testing.T) {
+	var asks int
+	srv := fakeServer(t, func(q string) (int, string) {
+		if strings.Contains(q, "__schema") {
+			return http.StatusBadRequest, introspectionDisabled
+		}
+		if strings.Contains(q, "info") && !strings.Contains(q, "versions") {
+			asks++
+			if asks == 1 {
+				return http.StatusServiceUnavailable, `{"errors":[{"message":"upstream down"}]}`
+			}
+			return http.StatusOK, `{"data":{"info":{"os":{"hostname":"Tower"}}}}`
+		}
+		return http.StatusOK, `{"data":{}}`
+	})
+	defer srv.Close()
+
+	a := New(srv.URL, "")
+	a.Refresh(context.Background())
+	a.Refresh(context.Background())
+
+	if asks != 2 {
+		t.Fatalf("asked %d times, want a retry after the 503", asks)
+	}
+	if id := a.Identity(); id.Hostname != "Tower" {
+		t.Errorf("hostname = %q, want Tower after recovery", id.Hostname)
+	}
+}
+
 func TestNilAdapterNotConfigured(t *testing.T) {
 	a := New("", "key")
 	if a != nil {

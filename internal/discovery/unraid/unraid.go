@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -30,6 +31,7 @@ type Adapter struct {
 	fields       map[string]bool // root query fields discovered by introspection
 	introspected bool            // false when the schema is unknown, not when it is empty
 	contacted    bool            // set after the first Refresh, successful or not
+	unsupported  map[string]bool // probes this server rejected as invalid
 	lastErr      error
 	identity     Identity
 }
@@ -73,6 +75,14 @@ type gqlRequest struct {
 	Query string `json:"query"`
 }
 
+// schemaError marks a query the server rejected as invalid, as opposed to one
+// that failed transiently. A running server's schema does not change, so a
+// rejected probe is not worth repeating on every reconcile.
+type schemaError struct{ err error }
+
+func (e schemaError) Error() string { return e.err.Error() }
+func (e schemaError) Unwrap() error { return e.err }
+
 type gqlResponse struct {
 	Data   json.RawMessage `json:"data"`
 	Errors []struct {
@@ -99,7 +109,11 @@ func (a *Adapter) query(ctx context.Context, q string) (json.RawMessage, error) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unraid api: %s%s", resp.Status, describeBody(resp.Body))
+		err := fmt.Errorf("unraid api: %s%s", resp.Status, describeBody(resp.Body))
+		if resp.StatusCode == http.StatusBadRequest {
+			return nil, schemaError{err}
+		}
+		return nil, err
 	}
 	var out gqlResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -171,60 +185,102 @@ func (a *Adapter) hasField(name string) bool {
 	return a.fields[name]
 }
 
-// fetchIdentity reads hostname, version, uptime and network addresses. It
-// skips fields introspection ruled out, and attempts all of them when the
-// schema is unknown. Every part is optional; only a total failure is an error.
+// probe runs one optional query, remembering the ones the server rejects as
+// invalid so a field this build does not implement is asked for once rather
+// than on every reconcile. A skipped probe returns (nil, nil).
+func (a *Adapter) probe(ctx context.Context, name, q string) (json.RawMessage, error) {
+	a.mu.Lock()
+	skip := a.unsupported[name]
+	a.mu.Unlock()
+	if skip {
+		return nil, nil
+	}
+	raw, err := a.query(ctx, q)
+	var se schemaError
+	if errors.As(err, &se) {
+		a.mu.Lock()
+		if a.unsupported == nil {
+			a.unsupported = map[string]bool{}
+		}
+		a.unsupported[name] = true
+		a.mu.Unlock()
+	}
+	return raw, err
+}
+
+// fetchIdentity reads hostname, version, uptime and network addresses. Each
+// datum is fetched on its own, because GraphQL validates a document as a whole
+// and one field this build does not implement would otherwise take down every
+// field sharing the request. Only a total failure is reported as an error.
 func (a *Adapter) fetchIdentity(ctx context.Context) error {
 	ident := Identity{Interfaces: map[string][]string{}}
-	var attempted int
+	var attempted, succeeded int
 	var firstErr error
 
-	if a.hasField("info") {
+	run := func(name, q string, parse func(json.RawMessage)) {
+		raw, err := a.probe(ctx, name, q)
+		if raw == nil && err == nil {
+			return // already known unsupported
+		}
 		attempted++
-		raw, err := a.query(ctx, `{ info { os { hostname uptime } versions { unraid } } }`)
 		if err != nil {
-			firstErr = err
-		} else {
+			if firstErr == nil {
+				firstErr = err
+			}
+			return
+		}
+		succeeded++
+		parse(raw)
+	}
+
+	if a.hasField("info") {
+		run("info.os", `{ info { os { hostname uptime } } }`, func(raw json.RawMessage) {
 			var doc struct {
 				Info struct {
 					OS struct {
 						Hostname string `json:"hostname"`
 						Uptime   string `json:"uptime"`
 					} `json:"os"`
+				} `json:"info"`
+			}
+			if json.Unmarshal(raw, &doc) != nil {
+				return
+			}
+			ident.Hostname = doc.Info.OS.Hostname
+			if t, err := time.Parse(time.RFC3339, doc.Info.OS.Uptime); err == nil {
+				ident.UptimeSeconds = int64(time.Since(t).Seconds())
+			}
+		})
+
+		// Cosmetic, and the field has moved between Unraid builds, so it is
+		// kept out of the request that carries the hostname.
+		run("info.versions", `{ info { versions { unraid } } }`, func(raw json.RawMessage) {
+			var doc struct {
+				Info struct {
 					Versions struct {
 						Unraid string `json:"unraid"`
 					} `json:"versions"`
 				} `json:"info"`
 			}
 			if json.Unmarshal(raw, &doc) == nil {
-				ident.Hostname = doc.Info.OS.Hostname
 				ident.UnraidVersion = doc.Info.Versions.Unraid
-				if t, err := time.Parse(time.RFC3339, doc.Info.OS.Uptime); err == nil {
-					ident.UptimeSeconds = int64(time.Since(t).Seconds())
-				}
 			}
-		}
+		})
 	}
 
 	if a.hasField("network") {
-		attempted++
-		raw, err := a.query(ctx, `{ network { iface { ifaceName ipv4 ip } } }`)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
-		} else if raw != nil {
+		run("network.iface", `{ network { iface { ifaceName ipv4 ip } } }`, func(raw json.RawMessage) {
 			parseInterfaces(raw, &ident)
-		}
+		})
 	}
 
 	a.mu.Lock()
 	a.identity = ident
 	a.mu.Unlock()
 
-	// Only a total washout counts as an outage: one field missing still leaves
-	// the rest of the identity usable, and the dashboard runs on Docker alone.
-	if attempted > 0 && ident.Hostname == "" && len(ident.LANAddresses) == 0 {
+	// Only a total washout counts as an outage: one unsupported field still
+	// leaves the rest usable, and the dashboard runs on Docker alone anyway.
+	if attempted > 0 && succeeded == 0 {
 		return firstErr
 	}
 	return nil
