@@ -20,9 +20,8 @@ services:
     restart: unless-stopped
 
   arraydeck:
-    build:
-      context: ../..
-    image: arraydeck:local
+    # For a locally built image instead: `make docker` and use arraydeck:local.
+    image: ghcr.io/gazofnaz/arraydeck:latest
     container_name: arraydeck
     user: "99:100" # Unraid's nobody:users; adjust for your host
     depends_on:

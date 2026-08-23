@@ -2,7 +2,7 @@
 <Container version="2">
   <Name>ArrayDeck</Name>
   <Repository>ghcr.io/gazofnaz/arraydeck:latest</Repository>
-  <Registry>https://ghcr.io/gazofnaz/arraydeck</Registry>
+  <Registry>https://github.com/gazofnaz/unraid-dashboard/pkgs/container/arraydeck</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
@@ -17,7 +17,7 @@
   </Overview>
   <Category>Tools:Utilities Tools:System</Category>
   <WebUI>http://[IP]:[PORT:8417]/</WebUI>
-  <TemplateURL/>
+  <TemplateURL>https://raw.githubusercontent.com/gazofnaz/unraid-dashboard/master/deploy/unraid/arraydeck.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/gazofnaz/unraid-dashboard/master/docs/icon.png</Icon>
   <ExtraParams/>
   <PostArgs/>

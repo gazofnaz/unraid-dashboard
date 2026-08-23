@@ -4,9 +4,8 @@
 # deployment.
 services:
   arraydeck:
-    build:
-      context: ../..
-    image: arraydeck:local
+    # For a locally built image instead: `make docker` and use arraydeck:local.
+    image: ghcr.io/gazofnaz/arraydeck:latest
     container_name: arraydeck
     ports:
       - "8417:8417"

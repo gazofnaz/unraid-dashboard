@@ -45,11 +45,24 @@ The full product and technical design lives in [`docs/`](docs/README.md).
 
 ## Quick start (Compose)
 
-```sh
-cd deploy/compose
-docker compose up --build
+In the Unraid Docker Compose plugin (or any compose host), create a stack and
+paste:
+
+```yaml
+services:
+  arraydeck:
+    image: ghcr.io/gazofnaz/arraydeck:latest
+    container_name: arraydeck
+    ports:
+      - "8417:8417"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /mnt/user/appdata/arraydeck:/data
+      - /boot/config/plugins/dockerMan/templates-user:/unraid/templates:ro
+    restart: unless-stopped
 ```
 
+Ready-made variants live in `deploy/compose/`.
 `docker-compose.hardened.yml` is the recommended production variant: a
 filtered [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy)
 owns the socket (write methods disabled), and ArrayDeck runs unprivileged with
@@ -122,3 +135,11 @@ deploy/                  compose + Unraid template
 
 The REST surface is documented in `docs/ARCHITECTURE.md` §3 and served under
 `/api/v1`; live updates stream over `GET /api/v1/events` (SSE).
+
+## Container publishing
+
+Every push to `master` builds and publishes `ghcr.io/gazofnaz/arraydeck:latest`
+and an immutable `sha-<commit>` tag from GitHub Actions
+(`.github/workflows/ci.yml`); pull requests build the image without publishing.
+No registry credentials are involved — CI authenticates with the workflow's
+`GITHUB_TOKEN`, and the published package is public.
